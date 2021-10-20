@@ -1,3 +1,5 @@
+import time
+
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -27,28 +29,50 @@ V, F, Fs = forces(c, r)
 pressure = sum(Fs) / (4 * np.pi * c.conf.L ** 2)
 
 # simulation
-# loops = c.conf.S_o + c.conf.S_d
-loops = 100
-T = np.zeros(loops)
+loops = c.conf.S_o + c.conf.S_d
+set_size = int(loops / c.conf.S_out)
+
+t_set = np.zeros(set_size)
+H_set = np.zeros(set_size)
+V_set = np.zeros(set_size)
+T_set = np.zeros(set_size)
+P_set = np.zeros(set_size)
+
 T_avg = 0
-P = np.zeros(loops)
-H = np.zeros(loops)
+P_avg = 0
+H_avg = 0
+
+frames = int(loops//c.conf.S_xyz)
+outputData = open(f'avs_{frames}frames_{time.time()}.dat', "w")
+outputData.write(f"{int(loops//c.conf.S_xyz)} {c.conf.N}\n")
 
 for s in range(loops):
     p = np.array([p_i + 0.5 * F_i * c.conf.tau for (p_i, F_i) in zip(p, F)])
     r = np.array([r_i + p_i * c.conf.tau / c.conf.m for (r_i, p_i) in zip(r, p)])
-
     V, F, Fs = forces(c, r)
-
     p = np.array([p_i + 0.5 * F_i * c.conf.tau for (p_i, F_i) in zip(p, F)])
 
-    E_kin_tmp = sum([np.linalg.norm(p_i) ** 2 / (2 * c.conf.m) for p_i in p])
+    E_kin_tmp = [np.linalg.norm(p_i) ** 2 / (2 * c.conf.m) for p_i in p]
 
-    T[s] = 2 * E_kin_tmp / (3 * c.conf.N * c.conf.k)
-    T_avg = sum(T) / c.conf.S_d
+    if s % c.conf.S_out == 0:
+        si = int(s / c.conf.S_out)
+        print(si)
+        t_set[si] = s * c.conf.tau
+        H_set[si] = sum(E_kin_tmp) + V
+        V_set[si] = V
+        T_set[si] = 2 * sum(E_kin_tmp) / (3 * c.conf.N * c.conf.k)
+        P_set[si] = sum([np.linalg.norm(Fs) ** 2 for Fs_i in Fs]) / (4 * np.pi * c.conf.L ** 2)
 
-    H[s] = E_kin_tmp + V
+    if s % c.conf.S_xyz == 0:
+        for i, r_i in enumerate(r):
+            outputData.write(f"{r_i[0]} {r_i[1]} {r_i[2]} {E_kin_tmp[i]}\n")
+        outputData.write("\n\n")
 
-# fig, ax = plt.subplots()
-# ax.plot(range(loops), T)
-# plt.show()
+    if s >= c.conf.S_o:
+        T_avg += 2 * sum(E_kin_tmp) / (3 * c.conf.N * c.conf.k * c.conf.S_d)
+        # P_avg = P_avg.append()
+        # H_avg = H_avg.append()
+
+    print(f"loop {s}/{loops}")
+
+outputData.close()
