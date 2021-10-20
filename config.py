@@ -1,5 +1,5 @@
 class Config:
-    inputData = open('data.txt', "r")
+    inputData = open('data_20_10_2021.txt', "r")
     n = int(inputData.readline())
     m = float(inputData.readline())
     a = float(inputData.readline())
