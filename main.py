@@ -1,15 +1,13 @@
 import time
+import sys
 
 import numpy as np
-import matplotlib.pyplot as plt
-
 from crystal import Crystal
 from init import generate_positions, generate_momentum
 from simulation import forces
-from graph import plot_positions, plot_momentum
 
 # kryształ (konfiguracja i baza)
-c = Crystal()
+c = Crystal(f"./data.txt")
 
 # położenia
 r = generate_positions(c)
@@ -32,19 +30,16 @@ pressure = sum(Fs) / (4 * np.pi * c.conf.L ** 2)
 loops = c.conf.S_o + c.conf.S_d
 set_size = int(loops / c.conf.S_out)
 
-t_set = np.zeros(set_size)
-H_set = np.zeros(set_size)
-V_set = np.zeros(set_size)
-T_set = np.zeros(set_size)
-P_set = np.zeros(set_size)
-
 T_avg = 0
 P_avg = 0
 H_avg = 0
 
-frames = int(loops//c.conf.S_xyz)
-outputData = open(f'avs_{frames}frames_{time.time()}.dat', "w")
-outputData.write(f"{int(loops//c.conf.S_xyz)} {c.conf.N}\n")
+frames = int(loops // c.conf.S_xyz)
+outputData = open(f'./xyz.dat', "w")
+outputData.write(f"{int(loops // c.conf.S_xyz)} {c.conf.N} {c.conf.tau} {c.conf.L}\n")
+
+outputDatatHVTP = open(f'./out.dat', "w")
+outputDatatHVTP.write(f"s\tt\tH\tV\tT\tP\n")
 
 for s in range(loops):
     p = np.array([p_i + 0.5 * F_i * c.conf.tau for (p_i, F_i) in zip(p, F)])
@@ -53,15 +48,17 @@ for s in range(loops):
     p = np.array([p_i + 0.5 * F_i * c.conf.tau for (p_i, F_i) in zip(p, F)])
 
     E_kin_tmp = [np.linalg.norm(p_i) ** 2 / (2 * c.conf.m) for p_i in p]
+    P_tmp = sum([np.linalg.norm(Fs) ** 2 for Fs_i in Fs]) / (4 * np.pi * c.conf.L ** 2)
 
     if s % c.conf.S_out == 0:
         si = int(s / c.conf.S_out)
         print(si)
-        t_set[si] = s * c.conf.tau
-        H_set[si] = sum(E_kin_tmp) + V
-        V_set[si] = V
-        T_set[si] = 2 * sum(E_kin_tmp) / (3 * c.conf.N * c.conf.k)
-        P_set[si] = sum([np.linalg.norm(Fs) ** 2 for Fs_i in Fs]) / (4 * np.pi * c.conf.L ** 2)
+        outputDatatHVTP.write(f"{si}\t"
+                              f"{s * c.conf.tau}\t"
+                              f"{sum(E_kin_tmp) + V}\t"
+                              f"{V}\t"
+                              f"{2 * sum(E_kin_tmp) / (3 * c.conf.N * c.conf.k)}\t"
+                              f"{P_tmp}\n")
 
     if s % c.conf.S_xyz == 0:
         for i, r_i in enumerate(r):
@@ -70,9 +67,8 @@ for s in range(loops):
 
     if s >= c.conf.S_o:
         T_avg += 2 * sum(E_kin_tmp) / (3 * c.conf.N * c.conf.k * c.conf.S_d)
-        # P_avg = P_avg.append()
-        # H_avg = H_avg.append()
-
-    print(f"loop {s}/{loops}")
+        P_avg += P_tmp / c.conf.S_d
+        H_avg += (sum(E_kin_tmp) + V) / c.conf.S_d
 
 outputData.close()
+outputDatatHVTP.close()
